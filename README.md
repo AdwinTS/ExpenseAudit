@@ -1,4 +1,4 @@
-# RuleCheck
+# ExpenseAudit
 
 An intelligent, AI-powered expense compliance platform that automatically audits employee expense claims against company policy — eliminating manual review, reducing spend leakage, and delivering instant, explainable decisions.
 
