@@ -1,0 +1,27 @@
+# Environment variables — never commit these
+.env
+.env.local
+.env.*.local
+
+# Python virtual environment
+expense/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Data — uploaded receipts and claims store
+data/images/
+data/claims.json
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# OS
+.DS_Store
+Thumbs.db
