@@ -34,6 +34,8 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("upload");
   const [detailId, setDetailId] = useState<string | null>(null);
 
+  const [logoExpanded, setLogoExpanded] = useState(false);
+
   function handleRoleSelect(r: Role) {
     setRole(r);
     setTab(r === "employee" ? "upload" : "dashboard");
@@ -57,11 +59,12 @@ export default function App() {
       <header className="bg-slate-900 text-white">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={`${accentColor} rounded-lg p-1.5`}>
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
+            <img
+              src="/logo.png"
+              alt="ExpenseAudit"
+              onClick={() => setLogoExpanded(v => !v)}
+              className={`cursor-pointer transition-all duration-500 ease-in-out ${logoExpanded ? "h-14 drop-shadow-lg" : "h-9"}`}
+            />
             <div>
               <span className="font-semibold tracking-tight">ExpenseAudit</span>
               <span className="text-slate-400 text-xs ml-2">Policy-First Compliance</span>

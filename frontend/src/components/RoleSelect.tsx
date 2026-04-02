@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 type Role = "employee" | "auditor";
 
 interface Props {
@@ -5,6 +7,7 @@ interface Props {
 }
 
 export default function RoleSelect({ onSelect }: Props) {
+  const [logoExpanded, setLogoExpanded] = useState(false);
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center px-4 relative overflow-hidden">
 
@@ -18,15 +21,19 @@ export default function RoleSelect({ onSelect }: Props) {
 
       <div className="relative z-10 flex flex-col items-center w-full max-w-3xl">
 
-        {/* Logo */}
-        <div className="flex items-center gap-3 mb-3">
-          <div className="bg-indigo-600 rounded-xl p-2.5 shadow-lg shadow-indigo-500/30">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          <span className="text-2xl font-bold text-white tracking-tight">ExpenseAudit</span>
+        {/* Logo — click to expand */}
+        <div className="flex flex-col items-center mb-3 cursor-pointer" onClick={() => setLogoExpanded(v => !v)}>
+          <img
+            src="/logo.png"
+            alt="ExpenseAudit"
+            className={`transition-all duration-500 ease-in-out ${logoExpanded ? "h-32 drop-shadow-2xl scale-105" : "h-12"}`}
+          />
+          {logoExpanded && (
+            <p className="text-slate-500 text-xs mt-2 animate-pulse">Click to collapse</p>
+          )}
         </div>
+
+        <span className="text-2xl font-bold text-white tracking-tight">ExpenseAudit</span>
 
         <p className="text-slate-400 text-sm mb-1">Policy-First Expense Compliance</p>
 
