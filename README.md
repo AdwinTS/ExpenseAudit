@@ -1,4 +1,4 @@
-# RuleCheck — Policy-First Expense Auditor
+# ExpenseAudit — Policy-First Expense Auditor
 
 An intelligent, AI-powered expense compliance platform that automatically audits employee expense claims against company policy — eliminating manual review, reducing spend leakage, and delivering instant, explainable decisions.
 
@@ -13,6 +13,13 @@ This platform solves that by combining **OCR receipt extraction**, **policy-awar
 ---
 
 ## Features
+
+### Role-Based Access
+- Dark landing page with role selector on first load
+- **Employee** view: Submit Expense, My Expenses, Notifications
+- **Finance Auditor** view: Claims Dashboard, Analytics
+- Role badge shown in navbar with a one-click "Switch" to return to the selector
+- No backend auth required — clean frontend role separation
 
 ### Employee Portal
 - Upload receipts as **JPG, PNG, or PDF**
@@ -95,6 +102,7 @@ expenseauditor/
 │   └── src/
 │       ├── App.tsx
 │       └── components/
+│           ├── RoleSelect.tsx      # Dark landing page with employee / auditor role selector
 │           ├── Upload.tsx          # Employee submission portal with how-it-works panel
 │           ├── Dashboard.tsx       # Finance overview table with category + score columns
 │           ├── ClaimDetail.tsx     # Audit trail timeline + side-by-side detail view
