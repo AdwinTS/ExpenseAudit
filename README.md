@@ -1,4 +1,4 @@
-# ExpenseAudit
+# RuleCheck — Policy-First Expense Auditor
 
 An intelligent, AI-powered expense compliance platform that automatically audits employee expense claims against company policy — eliminating manual review, reducing spend leakage, and delivering instant, explainable decisions.
 
@@ -26,16 +26,33 @@ This platform solves that by combining **OCR receipt extraction**, **policy-awar
 - Policy document is chunked and searched using keyword-based RAG
 - LLM (Groq LLaMA 3.3 70B) evaluates the claim against the most relevant policy sections
 - Returns a decision with a **one-sentence explanation citing the specific policy rule**
+- **Expense category auto-detection**: classifies each claim as Meals, Travel, Lodging, Equipment, etc.
+- **Compliance score**: 0–100 score per claim indicating degree of policy adherence
 - Risk scoring: **Low / Medium / High**
+- **Duplicate detection**: flags claims with matching merchant, amount, and date from the same employee
 
 ### Finance Dashboard
 - Table of all claims sorted by **risk level** (High → Medium → Low)
 - Summary cards: Total, Approved, Flagged, Rejected
+- Columns include **category tag** and **compliance score** per claim
+- Duplicate warning badge on suspicious claims
 - **Override** any AI decision with a custom comment
 - Click any claim to open the **Audit Detail View**
 
+### Spend Analytics
+- KPI cards: total claims, average compliance score, high-risk count, duplicate count
+- Three interactive **pie charts**: claims by decision, by expense category, and by risk level
+- Percentage labels on each slice with hover tooltips showing exact counts
+- Live data from all submitted claims
+
+### My Expenses (Employee View)
+- Employees search by name to see their personal claim history
+- Shows category, compliance score, duplicate flag, and audit reason per claim
+- Direct link to the full audit detail view for each claim
+
 ### Audit Detail View
 - Side-by-side layout: Receipt image | Extracted OCR data | Policy snippet + AI decision
+- **Visual audit trail timeline**: Submitted → Under Review → Decision → Overridden with coloured step indicators
 - Shows the exact policy section the AI used to make its decision
 - Displays date warnings and image quality flags
 - PDF receipts open in a new tab; images render inline
@@ -50,7 +67,7 @@ This platform solves that by combining **OCR receipt extraction**, **policy-awar
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 19, TypeScript, Tailwind CSS v4, Vite 5 |
+| Frontend | React 19, TypeScript, Tailwind CSS v4, Vite 5, Recharts |
 | Backend | Python 3.14, FastAPI, Uvicorn |
 | OCR | Pytesseract + Pillow + pdf2image |
 | LLM | Groq API — LLaMA 3.3 70B Versatile |
@@ -63,9 +80,9 @@ This platform solves that by combining **OCR receipt extraction**, **policy-awar
 ```
 expenseauditor/
 ├── backend/
-│   ├── app.py              # FastAPI routes: /upload, /claims, /override, /notifications
+│   ├── app.py              # FastAPI routes: /upload, /claims, /override, /notifications, /analytics, /my-claims
 │   ├── ocr.py              # OCR extraction, blur detection, PDF conversion
-│   ├── llm.py              # Groq LLM audit with structured prompt
+│   ├── llm.py              # Groq LLM audit — decision, reason, category, compliance score
 │   ├── policy_engine.py    # Policy chunking and keyword-based RAG retrieval
 │   └── requirements.txt
 │
@@ -78,13 +95,16 @@ expenseauditor/
 │   └── src/
 │       ├── App.tsx
 │       └── components/
-│           ├── Upload.tsx       # Employee submission portal
-│           ├── Dashboard.tsx    # Finance overview table
-│           ├── ClaimDetail.tsx  # Side-by-side audit detail view
-│           └── Notifications.tsx
+│           ├── Upload.tsx          # Employee submission portal with how-it-works panel
+│           ├── Dashboard.tsx       # Finance overview table with category + score columns
+│           ├── ClaimDetail.tsx     # Audit trail timeline + side-by-side detail view
+│           ├── SpendAnalytics.tsx  # Pie charts: by decision, category, risk
+│           ├── MyExpenses.tsx      # Employee personal claim history
+│           └── Notifications.tsx  # Employee status update inbox
 │
 ├── expense/                # Python virtual environment
 ├── .env.local              # API keys (not committed)
+├── APPROACH.md             # Solution design document
 └── README.md
 ```
 
@@ -138,6 +158,7 @@ GROQ_API_KEY=your_groq_api_key_here
 ### 5. Install frontend dependencies
 ```bash
 cd frontend
+npm install recharts
 npm install
 ```
 
@@ -174,6 +195,8 @@ The API is available at [http://localhost:8000](http://localhost:8000) — visit
 | `GET` | `/claims/{id}` | Get a single claim by ID |
 | `POST` | `/override` | Override an AI decision with a custom note |
 | `GET` | `/notifications/{employee}` | Get all status updates for an employee |
+| `GET` | `/my-claims/{employee}` | Get all claims submitted by an employee |
+| `GET` | `/analytics` | Aggregated stats: by decision, category, risk, avg score |
 
 ---
 
@@ -181,7 +204,9 @@ The API is available at [http://localhost:8000](http://localhost:8000) — visit
 ```
 Employee uploads receipt
         ↓
-OCR extracts: Merchant, Date, Amount, Currency
+OCR extracts: Merchant, Date, Amount, Currency + blur/quality check
+        ↓
+Duplicate detection: checks for same merchant + amount + date from same employee
         ↓
 Policy document is chunked into paragraphs
         ↓
@@ -189,9 +214,11 @@ Top 4 most relevant chunks retrieved via keyword matching
         ↓
 LLM receives: policy chunks + receipt text + business purpose
         ↓
-LLM returns: Decision + Reason (citing policy rule) + Risk level
+LLM returns: Decision + Reason (citing policy rule) + Risk + Category + Compliance Score
         ↓
 Claim saved with full audit trail + notifications generated
+        ↓
+Finance dashboard sorted by risk · Analytics updated · Employee notified
 ```
 
 ---

@@ -13,6 +13,9 @@ interface Claim {
   decision: string;
   reason: string;
   risk: string;
+  category?: string;
+  compliance_score?: number;
+  is_duplicate?: boolean;
   submitted_at: string;
   overridden: boolean;
   override_reason?: string;
@@ -105,8 +108,9 @@ export default function Dashboard({ onViewDetail }: { onViewDetail: (id: string)
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Employee</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Merchant</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Category</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Score</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Risk</th>
                   <th className="px-5 py-3"></th>
@@ -119,10 +123,19 @@ export default function Dashboard({ onViewDetail }: { onViewDetail: (id: string)
                       <td className="px-5 py-4">
                         <p className="font-medium text-slate-800">{claim.employee}</p>
                         <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[160px]">{claim.purpose}</p>
+                        {claim.is_duplicate && <span className="text-xs text-amber-600 font-medium">⚠ Duplicate</span>}
                       </td>
                       <td className="px-5 py-4 text-slate-700">{claim.merchant}</td>
+                      <td className="px-5 py-4">
+                        <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{claim.category || "Other"}</span>
+                      </td>
                       <td className="px-5 py-4 font-medium text-slate-800">{claim.currency} {claim.amount}</td>
-                      <td className="px-5 py-4 text-slate-600">{claim.date}</td>
+                      <td className="px-5 py-4">
+                        <span className={`text-sm font-bold ${(claim.compliance_score ?? 50) >= 80 ? "text-emerald-600" : (claim.compliance_score ?? 50) >= 50 ? "text-amber-600" : "text-rose-600"}`}>
+                          {claim.compliance_score ?? "—"}
+                        </span>
+                        <span className="text-xs text-slate-400">/100</span>
+                      </td>
                       <td className="px-5 py-4">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${statusConfig[claim.decision]?.bg || "bg-slate-100"} ${statusConfig[claim.decision]?.text || "text-slate-600"}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${statusConfig[claim.decision]?.dot || "bg-slate-400"}`}></span>
@@ -144,7 +157,7 @@ export default function Dashboard({ onViewDetail }: { onViewDetail: (id: string)
                     </tr>
                     {overrideId === claim.id && (
                       <tr key={`${claim.id}-override`} className="bg-indigo-50">
-                        <td colSpan={7} className="px-5 py-4">
+                        <td colSpan={8} className="px-5 py-4">
                           <div className="flex flex-wrap items-center gap-3">
                             <span className="text-xs font-medium text-slate-600">Change decision to:</span>
                             <select value={overrideDecision} onChange={(e) => setOverrideDecision(e.target.value)} className="border border-slate-300 rounded-md px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">

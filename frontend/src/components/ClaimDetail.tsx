@@ -17,6 +17,28 @@ const statusConfig: Record<string, { bg: string; text: string }> = {
   Rejected: { bg: "bg-rose-100",    text: "text-rose-700"    },
 };
 
+interface TimelineStep {
+  label: string;
+  sub: string;
+  done: boolean;
+  active: boolean;
+  color: string;
+}
+
+function buildTimeline(claim: Claim): TimelineStep[] {
+  const decided = claim.decision !== "";
+  const decisionColor =
+    claim.decision === "Approved" ? "bg-emerald-500" :
+    claim.decision === "Rejected" ? "bg-rose-500" : "bg-amber-400";
+
+  return [
+    { label: "Submitted",     sub: new Date(claim.submitted_at).toLocaleDateString(), done: true,    active: false, color: "bg-indigo-500" },
+    { label: "Under Review",  sub: "Policy cross-reference",                           done: decided, active: !decided, color: "bg-blue-500" },
+    { label: claim.decision || "Decision", sub: claim.decision ? `Risk: ${claim.risk}` : "Pending", done: decided, active: decided && !claim.overridden, color: decisionColor },
+    { label: "Overridden",    sub: claim.override_reason ? "By Finance team" : "—",   done: claim.overridden, active: claim.overridden, color: "bg-purple-500" },
+  ];
+}
+
 interface Props { claimId: string; onBack: () => void; }
 
 export default function ClaimDetail({ claimId }: Props) {
@@ -33,6 +55,7 @@ export default function ClaimDetail({ claimId }: Props) {
   if (!claim) return <p className="text-slate-500">Claim not found.</p>;
 
   const cfg = statusConfig[claim.decision] || { bg: "bg-slate-100", text: "text-slate-700" };
+  const timeline = buildTimeline(claim);
 
   return (
     <div className="space-y-6">
@@ -44,16 +67,36 @@ export default function ClaimDetail({ claimId }: Props) {
           <p className="text-sm text-slate-500 mt-0.5">{claim.purpose}</p>
         </div>
         <div className="flex items-center gap-3">
-          <span className={`px-4 py-2 rounded-md text-sm font-semibold ${cfg.bg} ${cfg.text}`}>
-            {claim.decision}
-          </span>
+          <span className={`px-4 py-2 rounded-md text-sm font-semibold ${cfg.bg} ${cfg.text}`}>{claim.decision}</span>
           {claim.overridden && <span className="text-xs bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full font-medium">Overridden</span>}
         </div>
       </div>
 
-      {/* 3-column detail view */}
+      {/* Audit Status Timeline */}
+      <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-6">
+        <h3 className="text-sm font-semibold text-slate-700 mb-6">Audit Trail</h3>
+        <div className="flex items-start justify-between relative">
+          {/* connector line */}
+          <div className="absolute top-4 left-0 right-0 h-0.5 bg-slate-200 mx-8" />
+          {timeline.map((step, i) => (
+            <div key={i} className="relative flex flex-col items-center flex-1 z-10">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm
+                ${step.done ? step.color : "bg-slate-200"}`}>
+                {step.done ? (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <span className="text-slate-400">{i + 1}</span>
+                )}
+              </div>
+              <p className={`text-xs font-semibold mt-2 text-center ${step.done ? "text-slate-800" : "text-slate-400"}`}>{step.label}</p>
+              <p className={`text-xs mt-0.5 text-center ${step.done ? "text-slate-500" : "text-slate-300"}`}>{step.sub}</p>
+            </div>
+          ))}
+        </div>
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
         {/* Column 1: Receipt Image */}
         <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
           <div className="bg-slate-50 border-b border-slate-200 px-4 py-3">

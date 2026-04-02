@@ -20,15 +20,19 @@ Receipt Text (OCR extracted):
 Employee Business Purpose: {purpose}
 
 Instructions:
+- Classify the expense into one of these categories: Meals, Travel, Lodging, Equipment, Training, Entertainment, Supplies, Telecommunications, Other
 - Check if the expense type, amount, and purpose comply with the policy.
 - Look for specific limit violations (e.g. dinner limit exceeded), prohibited items (alcohol, personal expenses), or missing justification.
 - Cite the specific policy rule in your reason (e.g. "Policy Section 2: Dinner limit is $75; claim was $95").
+- Give a compliance score from 0 to 100 (100 = fully compliant, 0 = clear violation).
 - Be strict but fair.
 
 Return ONLY in this exact format (no extra text):
 Decision: Approved
 Reason: One sentence citing the specific policy rule
-Risk: Low"""
+Risk: Low
+Category: Meals
+Score: 95"""
 
 
 def audit_expense(policy_chunk: str, receipt_text: str, purpose: str) -> dict:
@@ -56,16 +60,19 @@ def parse_llm_response(text: str) -> dict:
     decision = "Flagged"
     reason = "Could not parse LLM response."
     risk = "Medium"
+    category = "Other"
+    score = 50
 
-    d_match = re.search(r"Decision:\s*(Approved|Flagged|Rejected)", text, re.IGNORECASE)
-    r_match = re.search(r"Reason:\s*(.+)", text)
-    risk_match = re.search(r"Risk:\s*(Low|Medium|High)", text, re.IGNORECASE)
+    d_match     = re.search(r"Decision:\s*(Approved|Flagged|Rejected)", text, re.IGNORECASE)
+    r_match     = re.search(r"Reason:\s*(.+)", text)
+    risk_match  = re.search(r"Risk:\s*(Low|Medium|High)", text, re.IGNORECASE)
+    cat_match   = re.search(r"Category:\s*(\w+)", text, re.IGNORECASE)
+    score_match = re.search(r"Score:\s*(\d+)", text)
 
-    if d_match:
-        decision = d_match.group(1).capitalize()
-    if r_match:
-        reason = r_match.group(1).strip()
-    if risk_match:
-        risk = risk_match.group(1).capitalize()
+    if d_match:     decision  = d_match.group(1).capitalize()
+    if r_match:     reason    = r_match.group(1).strip()
+    if risk_match:  risk      = risk_match.group(1).capitalize()
+    if cat_match:   category  = cat_match.group(1).capitalize()
+    if score_match: score     = int(score_match.group(1))
 
-    return {"decision": decision, "reason": reason, "risk": risk}
+    return {"decision": decision, "reason": reason, "risk": risk, "category": category, "score": score}

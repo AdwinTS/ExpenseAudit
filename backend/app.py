@@ -76,6 +76,16 @@ async def upload_receipt(
         if expense_date not in ocr_result["date"] and ocr_result["date"] not in expense_date:
             date_warning = f"Date mismatch: claimed {expense_date}, receipt shows {ocr_result['date']}"
 
+    # Duplicate detection — same merchant + amount + employee
+    existing_claims = load_claims()
+    is_duplicate = any(
+        c["employee"].lower() == employee.lower()
+        and c["merchant"].lower() == ocr_result.get("merchant", "").lower()
+        and c["amount"] == ocr_result.get("amount", "")
+        and c["date"] == ocr_result.get("date", "")
+        for c in existing_claims
+    )
+
     # Policy RAG + LLM audit
     policy_context = get_policy_context(purpose, receipt_text)
     policy_snippet = get_policy_snippet(purpose, receipt_text)
@@ -99,6 +109,9 @@ async def upload_receipt(
         "decision": audit["decision"],
         "reason": audit["reason"],
         "risk": audit["risk"],
+        "category": audit.get("category", "Other"),
+        "compliance_score": audit.get("score", 50),
+        "is_duplicate": is_duplicate,
         "policy_used": policy_context,
         "policy_snippet": policy_snippet,
         "date_warning": date_warning,
@@ -116,6 +129,13 @@ async def upload_receipt(
     }
 
     # Add audit notification
+    if is_duplicate:
+        claim["notifications"].append({
+            "type": "warning",
+            "message": "Possible duplicate detected: a claim with the same merchant, amount, and date has been submitted before.",
+            "timestamp": datetime.utcnow().isoformat(),
+        })
+
     if audit["decision"] == "Approved":
         claim["notifications"].append({
             "type": "approved",
@@ -198,3 +218,45 @@ def get_notifications(employee: str):
                 result.append({**n, "claim_id": claim["id"], "merchant": claim["merchant"], "amount": claim["amount"], "currency": claim["currency"]})
     result.sort(key=lambda x: x["timestamp"], reverse=True)
     return result
+
+
+# ── GET /my-claims/{employee} ─────────────────────────────────────────────────
+@app.get("/my-claims/{employee}")
+def get_my_claims(employee: str):
+    claims = load_claims()
+    return [c for c in claims if c["employee"].lower() == employee.lower()]
+
+
+# ── GET /analytics ────────────────────────────────────────────────────────────
+@app.get("/analytics")
+def get_analytics():
+    claims = load_claims()
+    if not claims:
+        return {"by_decision": {}, "by_category": {}, "by_risk": {}, "avg_score": 0, "total": 0, "duplicate_count": 0}
+
+    by_decision: dict = {}
+    by_category: dict = {}
+    by_risk: dict = {}
+    scores = []
+    duplicates = 0
+
+    for c in claims:
+        d = c.get("decision", "Unknown")
+        cat = c.get("category", "Other")
+        risk = c.get("risk", "Unknown")
+        by_decision[d] = by_decision.get(d, 0) + 1
+        by_category[cat] = by_category.get(cat, 0) + 1
+        by_risk[risk] = by_risk.get(risk, 0) + 1
+        if c.get("compliance_score"):
+            scores.append(c["compliance_score"])
+        if c.get("is_duplicate"):
+            duplicates += 1
+
+    return {
+        "total": len(claims),
+        "by_decision": by_decision,
+        "by_category": by_category,
+        "by_risk": by_risk,
+        "avg_score": round(sum(scores) / len(scores), 1) if scores else 0,
+        "duplicate_count": duplicates,
+    }

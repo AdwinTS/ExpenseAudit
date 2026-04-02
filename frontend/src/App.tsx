@@ -3,8 +3,10 @@ import Upload from "./components/Upload";
 import Dashboard from "./components/Dashboard";
 import ClaimDetail from "./components/ClaimDetail";
 import Notifications from "./components/Notifications";
+import SpendAnalytics from "./components/SpendAnalytics";
+import MyExpenses from "./components/MyExpenses";
 
-export type Tab = "upload" | "dashboard" | "notifications";
+export type Tab = "upload" | "dashboard" | "analytics" | "my-expenses" | "notifications";
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("upload");
@@ -12,9 +14,19 @@ export default function App() {
 
   const navItems: { key: Tab; label: string }[] = [
     { key: "upload", label: "Submit Expense" },
+    { key: "my-expenses", label: "My Expenses" },
     { key: "dashboard", label: "Finance Dashboard" },
+    { key: "analytics", label: "Analytics" },
     { key: "notifications", label: "Notifications" },
   ];
+
+  const pageTitles: Record<Tab, { title: string; sub: string }> = {
+    "upload":        { title: "Submit Expense Claim",    sub: "Upload your receipt and provide a business justification for review." },
+    "my-expenses":   { title: "My Expense History",      sub: "View all your submitted claims and their current audit status." },
+    "dashboard":     { title: "Claims Overview",         sub: "Review, audit, and manage all submitted expense claims — sorted by risk level." },
+    "analytics":     { title: "Spend Analytics",         sub: "Visualise claim trends, category breakdown, and compliance scores across all submissions." },
+    "notifications": { title: "Notifications",           sub: "Track the status of your submitted expense claims." },
+  };
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -46,22 +58,16 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-6 py-4">
           {detailId ? (
             <div className="flex items-center gap-2">
-              <button onClick={() => setDetailId(null)} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center gap-1">
-                ← Back to Dashboard
+              <button onClick={() => setDetailId(null)} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+                ← Back
               </button>
               <span className="text-slate-300">/</span>
               <span className="text-sm text-slate-600">Claim Detail</span>
             </div>
           ) : (
             <>
-              <h1 className="text-lg font-semibold text-slate-800">
-                {tab === "upload" ? "Submit Expense Claim" : tab === "dashboard" ? "Claims Overview" : "Notifications"}
-              </h1>
-              <p className="text-sm text-slate-500 mt-0.5">
-                {tab === "upload" ? "Upload your receipt and provide a business justification for review."
-                  : tab === "dashboard" ? "Review, audit, and manage all submitted expense claims — sorted by risk level."
-                  : "Track the status of your submitted expense claims."}
-              </p>
+              <h1 className="text-lg font-semibold text-slate-800">{pageTitles[tab].title}</h1>
+              <p className="text-sm text-slate-500 mt-0.5">{pageTitles[tab].sub}</p>
             </>
           )}
         </div>
@@ -74,6 +80,10 @@ export default function App() {
           <Upload />
         ) : tab === "dashboard" ? (
           <Dashboard onViewDetail={(id) => { setDetailId(id); }} />
+        ) : tab === "analytics" ? (
+          <SpendAnalytics />
+        ) : tab === "my-expenses" ? (
+          <MyExpenses onViewDetail={(id) => { setDetailId(id); }} />
         ) : (
           <Notifications />
         )}
