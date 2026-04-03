@@ -41,12 +41,12 @@ This platform solves that by combining **OCR receipt extraction**, **policy-awar
 - Risk scoring: **Low / Medium / High**
 - **Duplicate detection**: flags claims with matching merchant, amount, and date from the same employee
 
-### Finance Dashboard
+### Finance Auditor Dashboard
 - Table of all claims sorted by **risk level** (High → Medium → Low)
 - Summary cards: Total, Approved, Flagged, Rejected
 - Columns include **category tag** and **compliance score** per claim
 - Duplicate warning badge on suspicious claims
-- **Override** any AI decision with a custom comment
+- **Override** any AI decision with a custom comment — triggers email to employee
 - Click any claim to open the **Audit Detail View**
 
 ### Spend Analytics
@@ -54,6 +54,12 @@ This platform solves that by combining **OCR receipt extraction**, **policy-awar
 - Three interactive **pie charts**: claims by decision, by expense category, and by risk level
 - Percentage labels on each slice with hover tooltips showing exact counts
 - Live data from all submitted claims
+
+### Policy Manager (Finance Auditor only)
+- Upload a new company policy as **.txt or .pdf** directly from the UI
+- PDF text is automatically extracted using pdfplumber
+- New policy takes effect immediately for all future audits — no restart needed
+- Live preview of the current policy with word count
 
 ### My Expenses (Employee View)
 - Auto-loads the logged-in employee's personal claim history — no name search needed
@@ -85,6 +91,7 @@ This platform solves that by combining **OCR receipt extraction**, **policy-awar
 | OCR | Pytesseract + Pillow + pdf2image |
 | LLM | Groq API — LLaMA 3.3 70B Versatile |
 | Policy RAG | Keyword-based chunk retrieval (no vector DB) |
+| Policy Ingestion | pdfplumber (PDF → text extraction) |
 | Storage | JSON flat file + local image storage |
 
 ---
@@ -117,6 +124,7 @@ expenseauditor/
 │           ├── Dashboard.tsx       # Finance overview table with category + score columns
 │           ├── ClaimDetail.tsx     # Audit trail timeline + side-by-side detail view
 │           ├── SpendAnalytics.tsx  # Pie charts: by decision, category, risk
+│           ├── PolicyManager.tsx   # Upload/replace company policy PDF or TXT
 │           ├── MyExpenses.tsx      # Employee personal claim history (auth-scoped)
 │           └── Notifications.tsx  # Employee status update inbox (auth-scoped)
 │
@@ -229,6 +237,8 @@ The API is available at [http://localhost:8000](http://localhost:8000) — visit
 | `GET` | `/notifications/{user_id}` | Get all status updates for a user (by Firebase UID) |
 | `GET` | `/my-claims/{user_id}` | Get all claims submitted by a user (by Firebase UID) |
 | `GET` | `/analytics` | Aggregated stats: by decision, category, risk, avg score |
+| `POST` | `/policy/upload` | Upload a new policy document (.txt or .pdf) |
+| `GET` | `/policy/preview` | Preview the current policy with word count |
 
 ---
 
@@ -240,9 +250,9 @@ OCR extracts: Merchant, Date, Amount, Currency + blur/quality check
         ↓
 Duplicate detection: checks for same merchant + amount + date from same employee
         ↓
-Policy document is chunked into paragraphs
+Policy document loaded (uploaded via Policy Manager or default policy.txt)
         ↓
-Top 4 most relevant chunks retrieved via keyword matching
+Policy chunked into paragraphs — top 4 retrieved via keyword matching
         ↓
 LLM receives: policy chunks + receipt text + business purpose
         ↓
@@ -250,7 +260,7 @@ LLM returns: Decision + Reason (citing policy rule) + Risk + Category + Complian
         ↓
 Claim saved with full audit trail + notifications generated
         ↓
-Finance dashboard sorted by risk · Analytics updated · Employee notified
+Email sent to employee via EmailJS · Dashboard updated · Analytics refreshed
 ```
 
 ---
