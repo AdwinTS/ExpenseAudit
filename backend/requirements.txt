@@ -6,3 +6,6 @@ pytesseract
 numpy
 openai
 pdf2image
+groq
+python-dotenv
+pdfplumber

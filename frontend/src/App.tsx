@@ -9,9 +9,10 @@ import ClaimDetail from "./components/ClaimDetail";
 import Notifications from "./components/Notifications";
 import SpendAnalytics from "./components/SpendAnalytics";
 import MyExpenses from "./components/MyExpenses";
+import PolicyManager from "./components/PolicyManager";
 
 type Role = "employee" | "auditor";
-type Tab = "upload" | "my-expenses" | "notifications" | "dashboard" | "analytics";
+type Tab = "upload" | "my-expenses" | "notifications" | "dashboard" | "analytics" | "policy";
 
 const employeeTabs: { key: Tab; label: string }[] = [
   { key: "upload",        label: "Submit Expense" },
@@ -22,6 +23,7 @@ const employeeTabs: { key: Tab; label: string }[] = [
 const auditorTabs: { key: Tab; label: string }[] = [
   { key: "dashboard", label: "Claims Dashboard" },
   { key: "analytics", label: "Analytics"        },
+  { key: "policy",    label: "Policy"            },
 ];
 
 const pageTitles: Record<Tab, { title: string; sub: string }> = {
@@ -30,6 +32,7 @@ const pageTitles: Record<Tab, { title: string; sub: string }> = {
   "notifications": { title: "Notifications",         sub: "Track the status of your submitted expense claims." },
   "dashboard":     { title: "Claims Overview",       sub: "Review, audit, and manage all submitted expense claims — sorted by risk level." },
   "analytics":     { title: "Spend Analytics",       sub: "Visualise claim trends, category breakdown, and compliance scores across all submissions." },
+  "policy":        { title: "Policy Manager",        sub: "Upload or replace the company Travel & Expense Policy document used for AI auditing." },
 };
 
 export default function App() {
@@ -142,6 +145,10 @@ export default function App() {
           <Notifications userId={user.uid} />
         ) : tab === "dashboard" ? (
           <Dashboard onViewDetail={(id) => setDetailId(id)} />
+        ) : tab === "analytics" ? (
+          <SpendAnalytics />
+        ) : tab === "policy" ? (
+          <PolicyManager />
         ) : (
           <SpendAnalytics />
         )}

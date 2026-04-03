@@ -264,3 +264,49 @@ def get_analytics():
         "avg_score": round(sum(scores) / len(scores), 1) if scores else 0,
         "duplicate_count": duplicates,
     }
+
+
+# ── POST /policy/upload ───────────────────────────────────────────────────────
+@app.post("/policy/upload")
+async def upload_policy(file: UploadFile = File(...)):
+    """Replace the policy document. Accepts .txt or .pdf."""
+    file_bytes = await file.read()
+    filename = (file.filename or "").lower()
+
+    if filename.endswith(".pdf"):
+        import io
+        import pdfplumber
+        text_pages = []
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            for page in pdf.pages:
+                t = page.extract_text()
+                if t:
+                    text_pages.append(t)
+        text = "\n\n".join(text_pages)
+        if not text.strip():
+            raise HTTPException(status_code=400, detail="Could not extract text from PDF.")
+    elif filename.endswith(".txt"):
+        text = file_bytes.decode("utf-8", errors="ignore")
+    else:
+        raise HTTPException(status_code=400, detail="Only .txt or .pdf files are supported.")
+
+    policy_path = os.path.join(DATA_DIR, "policy.txt")
+    with open(policy_path, "w", encoding="utf-8") as f:
+        f.write(text)
+
+    word_count = len(text.split())
+    return {"message": "Policy updated successfully.", "word_count": word_count}
+
+
+# ── GET /policy/preview ───────────────────────────────────────────────────────
+@app.get("/policy/preview")
+def preview_policy():
+    """Return the first 500 words of the current policy."""
+    policy_path = os.path.join(DATA_DIR, "policy.txt")
+    if not os.path.exists(policy_path):
+        return {"preview": "No policy loaded.", "word_count": 0}
+    with open(policy_path, "r", encoding="utf-8") as f:
+        text = f.read()
+    words = text.split()
+    preview = " ".join(words[:500]) + ("..." if len(words) > 500 else "")
+    return {"preview": preview, "word_count": len(words)}
