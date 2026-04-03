@@ -16,17 +16,20 @@ This platform solves that by combining **OCR receipt extraction**, **policy-awar
 
 ### Role-Based Access
 - Dark landing page with role selector on first load
+- **Firebase Email/Password authentication** — employees and auditors sign in with their own account
 - **Employee** view: Submit Expense, My Expenses, Notifications
 - **Finance Auditor** view: Claims Dashboard, Analytics
-- Role badge shown in navbar with a one-click "Switch" to return to the selector
-- No backend auth required — clean frontend role separation
+- Role badge and user email shown in navbar with sign out button
+- Claims and notifications are scoped per user — employees only see their own data
 
 ### Employee Portal
 - Upload receipts as **JPG, PNG, or PDF**
+- Employee name pre-filled from Firebase account (editable)
 - Provide a business justification and expense date
 - Receive an instant audit decision: **Approved**, **Flagged**, or **Rejected**
 - Automatic date consistency check (claimed date vs. receipt date)
 - Image quality validation (blur detection)
+- **Email notification** sent automatically to the employee's registered email on every decision
 
 ### AI Audit Engine
 - OCR extracts **Merchant Name**, **Date**, **Amount**, and **Currency** from receipts
@@ -53,7 +56,7 @@ This platform solves that by combining **OCR receipt extraction**, **policy-awar
 - Live data from all submitted claims
 
 ### My Expenses (Employee View)
-- Employees search by name to see their personal claim history
+- Auto-loads the logged-in employee's personal claim history — no name search needed
 - Shows category, compliance score, duplicate flag, and audit reason per claim
 - Direct link to the full audit detail view for each claim
 
@@ -65,8 +68,9 @@ This platform solves that by combining **OCR receipt extraction**, **policy-awar
 - PDF receipts open in a new tab; images render inline
 
 ### Notifications
-- Employees can look up their claim status by name
+- Auto-loads all status updates for the logged-in employee
 - Timestamped updates for every stage: Submitted, Approved, Flagged, Rejected, Overridden
+- **Email notifications** sent via EmailJS SMTP to the employee's registered email on every decision and override
 
 ---
 
@@ -76,6 +80,8 @@ This platform solves that by combining **OCR receipt extraction**, **policy-awar
 |---|---|
 | Frontend | React 19, TypeScript, Tailwind CSS v4, Vite 5, Recharts |
 | Backend | Python 3.14, FastAPI, Uvicorn |
+| Auth | Firebase Email/Password Authentication |
+| Email | EmailJS (SMTP via Gmail) |
 | OCR | Pytesseract + Pillow + pdf2image |
 | LLM | Groq API — LLaMA 3.3 70B Versatile |
 | Policy RAG | Keyword-based chunk retrieval (no vector DB) |
@@ -101,14 +107,18 @@ expenseauditor/
 ├── frontend/
 │   └── src/
 │       ├── App.tsx
+│       ├── firebase.ts             # Firebase auth configuration
+│       ├── lib/
+│       │   └── sendEmail.ts        # EmailJS email notification utility
 │       └── components/
 │           ├── RoleSelect.tsx      # Dark landing page with employee / auditor role selector
+│           ├── Login.tsx           # Firebase email/password sign in + sign up
 │           ├── Upload.tsx          # Employee submission portal with how-it-works panel
 │           ├── Dashboard.tsx       # Finance overview table with category + score columns
 │           ├── ClaimDetail.tsx     # Audit trail timeline + side-by-side detail view
 │           ├── SpendAnalytics.tsx  # Pie charts: by decision, category, risk
-│           ├── MyExpenses.tsx      # Employee personal claim history
-│           └── Notifications.tsx  # Employee status update inbox
+│           ├── MyExpenses.tsx      # Employee personal claim history (auth-scoped)
+│           └── Notifications.tsx  # Employee status update inbox (auth-scoped)
 │
 ├── expense/                # Python virtual environment
 ├── .env.local              # API keys (not committed)
@@ -127,6 +137,8 @@ Before running the project, ensure the following are installed:
 - **Tesseract OCR** — [Windows installer](https://github.com/UB-Mannheim/tesseract/wiki)
 - **Poppler** (for PDF support) — [Windows binaries](https://github.com/oschwartz10612/poppler-windows/releases)
 - **Groq API key** (free) — [console.groq.com](https://console.groq.com/keys)
+- **Firebase project** with Email/Password auth enabled — [console.firebase.google.com](https://console.firebase.google.com)
+- **EmailJS account** with SMTP service configured — [emailjs.com](https://www.emailjs.com)
 
 ---
 
@@ -134,7 +146,7 @@ Before running the project, ensure the following are installed:
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/your-username/expense-auditor.git
+git clone https://github.com/AdwinTS/ExpenseAudit.git
 cd expense-auditor
 ```
 
@@ -158,6 +170,19 @@ pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tessera
 POPPLER_PATH = r"C:\poppler\Library\bin"
 ```
 
+Create a `frontend/.env.local` file inside the frontend folder:
+```env
+VITE_FIREBASE_API_KEY=your_firebase_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_APP_ID=your_app_id
+VITE_STORAGE_BUCKET=your_project.firebasestorage.app
+VITE_MESSAGING_SENDER_ID=your_sender_id
+VITE_EMAILJS_SERVICE_ID=service_xxxxxxx
+VITE_EMAILJS_TEMPLATE_ID=template_xxxxxxx
+VITE_EMAILJS_PUBLIC_KEY=your_emailjs_public_key
+```
+
 Create a `.env.local` file in the project root:
 ```env
 GROQ_API_KEY=your_groq_api_key_here
@@ -166,7 +191,6 @@ GROQ_API_KEY=your_groq_api_key_here
 ### 5. Install frontend dependencies
 ```bash
 cd frontend
-npm install recharts
 npm install
 ```
 
@@ -202,8 +226,8 @@ The API is available at [http://localhost:8000](http://localhost:8000) — visit
 | `GET` | `/claims` | Retrieve all claims, sorted by risk |
 | `GET` | `/claims/{id}` | Get a single claim by ID |
 | `POST` | `/override` | Override an AI decision with a custom note |
-| `GET` | `/notifications/{employee}` | Get all status updates for an employee |
-| `GET` | `/my-claims/{employee}` | Get all claims submitted by an employee |
+| `GET` | `/notifications/{user_id}` | Get all status updates for a user (by Firebase UID) |
+| `GET` | `/my-claims/{user_id}` | Get all claims submitted by a user (by Firebase UID) |
 | `GET` | `/analytics` | Aggregated stats: by decision, category, risk, avg score |
 
 ---
@@ -233,9 +257,16 @@ Finance dashboard sorted by risk · Analytics updated · Employee notified
 
 ## Environment Variables
 
-| Variable | Description |
-|---|---|
-| `GROQ_API_KEY` | Your Groq API key for LLaMA 3.3 inference |
+| Variable | Location | Description |
+|---|---|---|
+| `GROQ_API_KEY` | `.env.local` (root) | Groq API key for LLaMA 3.3 inference |
+| `VITE_FIREBASE_API_KEY` | `frontend/.env.local` | Firebase project API key |
+| `VITE_FIREBASE_AUTH_DOMAIN` | `frontend/.env.local` | Firebase auth domain |
+| `VITE_FIREBASE_PROJECT_ID` | `frontend/.env.local` | Firebase project ID |
+| `VITE_FIREBASE_APP_ID` | `frontend/.env.local` | Firebase app ID |
+| `VITE_EMAILJS_SERVICE_ID` | `frontend/.env.local` | EmailJS SMTP service ID |
+| `VITE_EMAILJS_TEMPLATE_ID` | `frontend/.env.local` | EmailJS template ID |
+| `VITE_EMAILJS_PUBLIC_KEY` | `frontend/.env.local` | EmailJS public key |
 
 ---
 
