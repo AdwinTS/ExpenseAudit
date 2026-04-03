@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import { auth } from "./firebase";
 import RoleSelect from "./components/RoleSelect";
+import Login from "./components/Login";
 import Upload from "./components/Upload";
 import Dashboard from "./components/Dashboard";
 import ClaimDetail from "./components/ClaimDetail";
@@ -11,14 +14,14 @@ type Role = "employee" | "auditor";
 type Tab = "upload" | "my-expenses" | "notifications" | "dashboard" | "analytics";
 
 const employeeTabs: { key: Tab; label: string }[] = [
-  { key: "upload",       label: "Submit Expense" },
-  { key: "my-expenses",  label: "My Expenses"    },
-  { key: "notifications",label: "Notifications"  },
+  { key: "upload",        label: "Submit Expense" },
+  { key: "my-expenses",   label: "My Expenses"    },
+  { key: "notifications", label: "Notifications"  },
 ];
 
 const auditorTabs: { key: Tab; label: string }[] = [
-  { key: "dashboard",  label: "Claims Dashboard" },
-  { key: "analytics",  label: "Analytics"        },
+  { key: "dashboard", label: "Claims Dashboard" },
+  { key: "analytics", label: "Analytics"        },
 ];
 
 const pageTitles: Record<Tab, { title: string; sub: string }> = {
@@ -31,10 +34,18 @@ const pageTitles: Record<Tab, { title: string; sub: string }> = {
 
 export default function App() {
   const [role, setRole] = useState<Role | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [tab, setTab] = useState<Tab>("upload");
   const [detailId, setDetailId] = useState<string | null>(null);
-
   const [logoExpanded, setLogoExpanded] = useState(false);
+
+  useEffect(() => {
+    return onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setAuthReady(true);
+    });
+  }, []);
 
   function handleRoleSelect(r: Role) {
     setRole(r);
@@ -42,16 +53,24 @@ export default function App() {
     setDetailId(null);
   }
 
+  function handleSignOut() {
+    signOut(auth);
+    setRole(null);
+    setDetailId(null);
+  }
+
+  if (!authReady) return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="animate-spin h-6 w-6 border-2 border-indigo-500 border-t-transparent rounded-full" />
+    </div>
+  );
+
   if (!role) return <RoleSelect onSelect={handleRoleSelect} />;
+  if (!user) return <Login role={role} onBack={() => setRole(null)} />;
 
   const navItems = role === "employee" ? employeeTabs : auditorTabs;
-  const accentColor = role === "employee" ? "bg-indigo-600" : "bg-emerald-600";
-  const activeTab = role === "employee"
-    ? "bg-indigo-600 text-white"
-    : "bg-emerald-600 text-white";
-  const roleBadge = role === "employee"
-    ? "bg-indigo-100 text-indigo-700"
-    : "bg-emerald-100 text-emerald-700";
+  const activeTab = role === "employee" ? "bg-indigo-600 text-white" : "bg-emerald-600 text-white";
+  const roleBadge = role === "employee" ? "bg-indigo-900 text-indigo-300" : "bg-emerald-900 text-emerald-300";
   const roleLabel = role === "employee" ? "Employee" : "Finance Auditor";
 
   return (
@@ -59,12 +78,9 @@ export default function App() {
       <header className="bg-slate-900 text-white">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img
-              src="/logo.png"
-              alt="ExpenseAudit"
+            <img src="/logo.png" alt="ExpenseAudit"
               onClick={() => setLogoExpanded(v => !v)}
-              className={`cursor-pointer transition-all duration-500 ease-in-out ${logoExpanded ? "h-14 drop-shadow-lg" : "h-9"}`}
-            />
+              className={`cursor-pointer transition-all duration-500 ease-in-out ${logoExpanded ? "h-14 drop-shadow-lg" : "h-9"}`} />
             <div>
               <span className="font-semibold tracking-tight">ExpenseAudit</span>
               <span className="text-slate-400 text-xs ml-2">Policy-First Compliance</span>
@@ -76,24 +92,22 @@ export default function App() {
               {navItems.map(item => (
                 <button key={item.key}
                   onClick={() => { setTab(item.key); setDetailId(null); }}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    tab === item.key ? activeTab : "text-slate-300 hover:text-white hover:bg-slate-800"
-                  }`}>
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === item.key ? activeTab : "text-slate-300 hover:text-white hover:bg-slate-800"}`}>
                   {item.label}
                 </button>
               ))}
             </nav>
 
-            {/* Role badge + switch */}
             <div className="flex items-center gap-2 ml-3 pl-3 border-l border-slate-700">
-              <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${roleBadge}`}>
-                {roleLabel}
-              </span>
-              <button
-                onClick={() => setRole(null)}
-                className="text-xs text-slate-400 hover:text-white transition-colors"
-                title="Switch role">
-                Switch
+              {/* User info */}
+              <div className="text-right hidden sm:block">
+                <p className="text-xs text-white font-medium leading-tight">{user.displayName || "User"}</p>
+                <p className="text-xs text-slate-500 leading-tight">{user.email}</p>
+              </div>
+              <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${roleBadge}`}>{roleLabel}</span>
+              <button onClick={handleSignOut}
+                className="text-xs text-slate-400 hover:text-rose-400 transition-colors ml-1" title="Sign out">
+                Sign out
               </button>
             </div>
           </div>
@@ -104,9 +118,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-6 py-4">
           {detailId ? (
             <div className="flex items-center gap-2">
-              <button onClick={() => setDetailId(null)} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
-                ← Back
-              </button>
+              <button onClick={() => setDetailId(null)} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">← Back</button>
               <span className="text-slate-300">/</span>
               <span className="text-sm text-slate-600">Claim Detail</span>
             </div>
@@ -123,11 +135,11 @@ export default function App() {
         {detailId ? (
           <ClaimDetail claimId={detailId} onBack={() => setDetailId(null)} />
         ) : tab === "upload" ? (
-          <Upload />
+          <Upload user={user} />
         ) : tab === "my-expenses" ? (
-          <MyExpenses onViewDetail={(id) => setDetailId(id)} />
+          <MyExpenses userId={user.uid} onViewDetail={(id) => setDetailId(id)} />
         ) : tab === "notifications" ? (
-          <Notifications />
+          <Notifications userId={user.uid} />
         ) : tab === "dashboard" ? (
           <Dashboard onViewDetail={(id) => setDetailId(id)} />
         ) : (

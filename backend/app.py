@@ -53,6 +53,8 @@ async def upload_receipt(
     employee: str = Form(...),
     purpose: str = Form(...),
     expense_date: str = Form(default=""),
+    user_id: str = Form(default=""),
+    user_email: str = Form(default=""),
 ):
     file_bytes = await file.read()
 
@@ -99,6 +101,8 @@ async def upload_receipt(
         "id": str(uuid.uuid4()),
         "employee": employee,
         "purpose": purpose,
+        "user_id": user_id,
+        "user_email": user_email,
         "expense_date": expense_date,
         "merchant": ocr_result.get("merchant", "Unknown"),
         "date": ocr_result.get("date", "Unknown"),
@@ -208,12 +212,12 @@ def override_claim(body: OverrideRequest):
 
 
 # ── GET /notifications/{employee} ─────────────────────────────────────────────
-@app.get("/notifications/{employee}")
-def get_notifications(employee: str):
+@app.get("/notifications/{user_id}")
+def get_notifications(user_id: str):
     claims = load_claims()
     result = []
     for claim in claims:
-        if claim["employee"].lower() == employee.lower():
+        if claim.get("user_id") == user_id:
             for n in claim.get("notifications", []):
                 result.append({**n, "claim_id": claim["id"], "merchant": claim["merchant"], "amount": claim["amount"], "currency": claim["currency"]})
     result.sort(key=lambda x: x["timestamp"], reverse=True)
@@ -221,10 +225,10 @@ def get_notifications(employee: str):
 
 
 # ── GET /my-claims/{employee} ─────────────────────────────────────────────────
-@app.get("/my-claims/{employee}")
-def get_my_claims(employee: str):
+@app.get("/my-claims/{user_id}")
+def get_my_claims(user_id: str):
     claims = load_claims()
-    return [c for c in claims if c["employee"].lower() == employee.lower()]
+    return [c for c in claims if c.get("user_id") == user_id]
 
 
 # ── GET /analytics ────────────────────────────────────────────────────────────

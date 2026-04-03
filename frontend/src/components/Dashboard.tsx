@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import React from "react";
+import { sendClaimEmail } from "../lib/sendEmail";
 
 const API = "http://localhost:8000";
 
@@ -51,11 +53,26 @@ export default function Dashboard({ onViewDetail }: { onViewDetail: (id: string)
   useEffect(() => { fetchClaims(); }, []);
 
   async function submitOverride(id: string) {
-    await fetch(`${API}/override`, {
+    const res = await fetch(`${API}/override`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ claim_id: id, new_decision: overrideDecision, override_reason: overrideReason }),
     });
+    const updated = await res.json();
+
+    // Send email to employee if we have their email
+    if (updated.user_email) {
+      await sendClaimEmail({
+        to_email:      updated.user_email,
+        employee_name: updated.employee,
+        status:        `${overrideDecision} (Overridden)`,
+        merchant:      updated.merchant,
+        currency:      updated.currency,
+        amount:        updated.amount,
+        message:       overrideReason || `Finance team has updated your claim decision to ${overrideDecision}.`,
+      }).catch(() => {});
+    }
+
     setOverrideId(null);
     setOverrideReason("");
     fetchClaims();
@@ -118,7 +135,7 @@ export default function Dashboard({ onViewDetail }: { onViewDetail: (id: string)
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {claims.map((claim) => (
-                  <>
+                  <React.Fragment key={claim.id}>
                     <tr key={claim.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-5 py-4">
                         <p className="font-medium text-slate-800">{claim.employee}</p>
@@ -173,7 +190,7 @@ export default function Dashboard({ onViewDetail }: { onViewDetail: (id: string)
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

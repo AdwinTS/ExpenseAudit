@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const API = "http://localhost:8000";
 
@@ -17,48 +17,31 @@ const statusConfig: Record<string, { bg: string; text: string; dot: string }> = 
 
 const scoreColor = (s: number) => s >= 80 ? "text-emerald-600" : s >= 50 ? "text-amber-600" : "text-rose-600";
 
-export default function MyExpenses({ onViewDetail }: { onViewDetail: (id: string) => void }) {
-  const [name, setName] = useState("");
-  const [searched, setSearched] = useState("");
+export default function MyExpenses({ userId, onViewDetail }: { userId: string; onViewDetail: (id: string) => void }) {
   const [claims, setClaims] = useState<Claim[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  async function search() {
-    if (!name.trim()) return;
-    setLoading(true);
-    const res = await fetch(`${API}/my-claims/${encodeURIComponent(name.trim())}`);
-    const data = await res.json();
-    setClaims(data.reverse());
-    setSearched(name.trim());
-    setLoading(false);
-  }
+  useEffect(() => {
+    fetch(`${API}/my-claims/${encodeURIComponent(userId)}`)
+      .then(r => r.json())
+      .then(data => { setClaims(data.reverse()); setLoading(false); });
+  }, [userId]);
+
+  if (loading) return (
+    <div className="flex justify-center py-16">
+      <div className="animate-spin h-5 w-5 border-2 border-indigo-500 border-t-transparent rounded-full" />
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-6">
-        <h2 className="text-base font-semibold text-slate-800 mb-1">My Expense History</h2>
-        <p className="text-xs text-slate-500 mb-4">Enter your name to view all your submitted claims and their current audit status.</p>
-        <div className="flex gap-3">
-          <input type="text" value={name} onChange={e => setName(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && search()}
-            placeholder="Enter your full name..."
-            className="flex-1 border border-slate-300 rounded-md px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <button onClick={search} disabled={loading}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-5 py-2.5 rounded-md transition-colors disabled:bg-slate-300">
-            {loading ? "..." : "Search"}
-          </button>
+    <div className="space-y-4">
+      {claims.length === 0 ? (
+        <div className="bg-white rounded-lg border border-slate-200 p-10 text-center text-slate-400 text-sm">
+          You haven't submitted any claims yet.
         </div>
-      </div>
-
-      {searched && (
+      ) : (
         <>
-          {claims.length === 0 ? (
-            <div className="bg-white rounded-lg border border-slate-200 p-10 text-center text-slate-400 text-sm">
-              No claims found for "{searched}".
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-sm text-slate-500">{claims.length} claim{claims.length !== 1 ? "s" : ""} for "{searched}"</p>
+          <p className="text-sm text-slate-500">{claims.length} claim{claims.length !== 1 ? "s" : ""} submitted</p>
               {claims.map(claim => {
                 const cfg = statusConfig[claim.decision] || { bg: "bg-slate-100", text: "text-slate-600", dot: "bg-slate-400" };
                 return (
@@ -101,8 +84,6 @@ export default function MyExpenses({ onViewDetail }: { onViewDetail: (id: string
                   </div>
                 );
               })}
-            </div>
-          )}
         </>
       )}
     </div>

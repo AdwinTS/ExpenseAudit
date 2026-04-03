@@ -1,4 +1,6 @@
 import { useState } from "react";
+import type { User } from "firebase/auth";
+import { sendClaimEmail } from "../lib/sendEmail";
 
 const API = "http://localhost:8000";
 
@@ -41,8 +43,8 @@ const riskColors: Record<string, string> = {
   Low: "text-emerald-600", Medium: "text-amber-600", High: "text-rose-600",
 };
 
-export default function Upload() {
-  const [employee, setEmployee] = useState("");
+export default function Upload({ user }: { user: User }) {
+  const [employee, setEmployee] = useState(user.displayName || "");
   const [purpose, setPurpose] = useState("");
   const [expenseDate, setExpenseDate] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -59,12 +61,37 @@ export default function Upload() {
     form.append("employee", employee);
     form.append("purpose", purpose);
     form.append("expense_date", expenseDate);
+    form.append("user_id", user.uid);
+    form.append("user_email", user.email || "");
     try {
       const res = await fetch(`${API}/upload`, { method: "POST", body: form });
       if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "Submission failed."); }
       const data = await res.json();
       setResult(data);
-      setEmployee(""); setPurpose(""); setExpenseDate(""); setFile(null);
+
+      // Send email notification to the employee
+      if (user.email) {
+        const statusMessages: Record<string, string> = {
+          Approved: "Your claim has been approved. Reimbursement will be processed within 5–7 business days.",
+          Flagged:  `Your claim requires further review: ${data.reason}`,
+          Rejected: `Your claim was rejected: ${data.reason}`,
+        };
+        try {
+          await sendClaimEmail({
+            to_email:      user.email,
+            employee_name: employee,
+            status:        data.decision,
+            merchant:      data.merchant,
+            currency:      data.currency,
+            amount:        data.amount,
+            message:       statusMessages[data.decision] || data.reason,
+          });
+          console.log("Email sent successfully to", user.email);
+        } catch (emailErr) {
+          console.error("EmailJS error:", emailErr);
+        }
+      }
+      setEmployee(user.displayName || ""); setPurpose(""); setExpenseDate(""); setFile(null);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred. Please try again.");
     } finally { setLoading(false); }
@@ -116,8 +143,9 @@ export default function Upload() {
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Employee Name <span className="text-rose-500">*</span></label>
               <input type="text" value={employee} onChange={(e) => setEmployee(e.target.value)}
-                placeholder="e.g. Sarah Johnson"
-                className="w-full border border-slate-300 rounded-md px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+                placeholder="Your full name"
+                className="w-full border border-slate-300 rounded-md px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+              <p className="text-xs text-slate-400 mt-1">Signed in as {user.email}</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Expense Date <span className="text-rose-500">*</span></label>
