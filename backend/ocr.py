@@ -4,11 +4,9 @@ import os
 from PIL import Image
 import pytesseract
 
-# Windows dev: use hardcoded path. Linux (Railway/production): use system tesseract
-if os.name == "nt":
-    pytesseract.pytesseract.tesseract_cmd = r"D:\Program Files\Tesseract-OCR\tesseract.exe"
+pytesseract.pytesseract.tesseract_cmd = r"D:\Program Files\Tesseract-OCR\tesseract.exe"
 
-POPPLER_PATH = r"D:\popplers\poppler-25.12.0\Library\bin" if os.name == "nt" else None
+POPPLER_PATH = r"D:\popplers\poppler-25.12.0\Library\bin"
 
 
 def check_image_quality(image: Image.Image) -> bool:
@@ -25,10 +23,7 @@ POPPLER_PATH = r"D:\popplers\poppler-25.12.0\Library\bin"
 def pdf_to_image(file_bytes: bytes) -> Image.Image:
     """Convert first page of a PDF to a PIL Image using pdf2image."""
     from pdf2image import convert_from_bytes
-    kwargs = {"dpi": 200, "first_page": 1, "last_page": 1}
-    if POPPLER_PATH:
-        kwargs["poppler_path"] = POPPLER_PATH
-    pages = convert_from_bytes(file_bytes, **kwargs)
+    pages = convert_from_bytes(file_bytes, dpi=200, first_page=1, last_page=1, poppler_path=POPPLER_PATH)
     return pages[0]
 
 
