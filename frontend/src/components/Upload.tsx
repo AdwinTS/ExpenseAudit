@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { User } from "firebase/auth";
 import { sendClaimEmail } from "../lib/sendEmail";
 
-const API = "http://localhost:8000";
+import API from "../lib/api";
 
 interface Claim {
   id: string; employee: string; purpose: string; merchant: string;

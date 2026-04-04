@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const API = "http://localhost:8000";
+import API from "../lib/api";
 
 interface Claim {
   id: string; employee: string; purpose: string; merchant: string;

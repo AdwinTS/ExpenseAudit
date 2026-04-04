@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import React from "react";
 import { sendClaimEmail } from "../lib/sendEmail";
 
-const API = "http://localhost:8000";
+import API from "../lib/api";
 
 interface Claim {
   id: string;

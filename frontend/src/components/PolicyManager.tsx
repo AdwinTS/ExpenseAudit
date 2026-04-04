@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const API = "http://localhost:8000";
+import API from "../lib/api";
 
 export default function PolicyManager() {
   const [file, setFile] = useState<File | null>(null);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
-const API = "http://localhost:8000";
+import API from "../lib/api";
 
 interface Analytics {
   total: number;
