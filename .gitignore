@@ -4,6 +4,10 @@
 .env.*.local
 frontend/.env.local
 
+# Firebase service account key — never commit
+data/serviceAccountKey.json
+*serviceAccountKey*.json
+
 # Python virtual environment
 expense/
 

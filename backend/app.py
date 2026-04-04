@@ -1,9 +1,9 @@
-import json
 import os
 import uuid
-import base64
 from datetime import datetime
 
+import firebase_admin
+from firebase_admin import credentials, firestore
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -13,8 +13,15 @@ from ocr import extract_text_from_image
 from policy_engine import get_policy_context, get_policy_snippet
 from llm import audit_expense
 
-app = FastAPI(title="Policy-First Expense Auditor")
+# ── Firebase init ─────────────────────────────────────────────────────────────
+BASE_DIR = os.path.dirname(__file__)
+KEY_PATH = os.path.join(BASE_DIR, "..", "data", "serviceAccountKey.json")
+cred = credentials.Certificate(KEY_PATH)
+firebase_admin.initialize_app(cred)
+db = firestore.client()
 
+# ── FastAPI app ───────────────────────────────────────────────────────────────
+app = FastAPI(title="Policy-First Expense Auditor")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,28 +30,10 @@ app.add_middleware(
     allow_credentials=False,
 )
 
-BASE_DIR    = os.path.dirname(__file__)
-DATA_DIR    = os.path.join(BASE_DIR, "..", "data")
-CLAIMS_PATH = os.path.join(DATA_DIR, "claims.json")
-IMAGES_DIR  = os.path.join(DATA_DIR, "images")
+DATA_DIR   = os.path.join(BASE_DIR, "..", "data")
+IMAGES_DIR = os.path.join(DATA_DIR, "images")
 os.makedirs(IMAGES_DIR, exist_ok=True)
-
-# Serve uploaded receipt images as static files
 app.mount("/receipts", StaticFiles(directory=IMAGES_DIR), name="receipts")
-
-
-def load_claims() -> list:
-    if not os.path.exists(CLAIMS_PATH):
-        return []
-    with open(CLAIMS_PATH, "r") as f:
-        return json.load(f)
-
-
-def save_claims(claims: list):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(CLAIMS_PATH, "w") as f:
-        json.dump(claims, f, indent=2)
-
 
 # ── POST /upload ──────────────────────────────────────────────────────────────
 @app.post("/upload")
@@ -58,37 +47,31 @@ async def upload_receipt(
 ):
     file_bytes = await file.read()
 
-    # Save receipt image to disk
     ext = os.path.splitext(file.filename or "receipt")[1] or ".jpg"
     image_filename = f"{uuid.uuid4()}{ext}"
-    image_path = os.path.join(IMAGES_DIR, image_filename)
-    with open(image_path, "wb") as f:
+    with open(os.path.join(IMAGES_DIR, image_filename), "wb") as f:
         f.write(file_bytes)
 
-    # OCR
     ocr_result = extract_text_from_image(file_bytes, file.filename)
     if "error" in ocr_result:
         raise HTTPException(status_code=400, detail=ocr_result["error"])
 
     receipt_text = ocr_result["raw_text"] or "No text extracted"
 
-    # Date consistency check
     date_warning = ""
     if expense_date and ocr_result.get("date", "Unknown") != "Unknown":
         if expense_date not in ocr_result["date"] and ocr_result["date"] not in expense_date:
             date_warning = f"Date mismatch: claimed {expense_date}, receipt shows {ocr_result['date']}"
 
-    # Duplicate detection — same merchant + amount + employee
-    existing_claims = load_claims()
-    is_duplicate = any(
-        c["employee"].lower() == employee.lower()
-        and c["merchant"].lower() == ocr_result.get("merchant", "").lower()
-        and c["amount"] == ocr_result.get("amount", "")
-        and c["date"] == ocr_result.get("date", "")
-        for c in existing_claims
-    )
+    # Duplicate detection
+    existing = db.collection("claims")\
+        .where("user_id", "==", user_id)\
+        .where("merchant", "==", ocr_result.get("merchant", ""))\
+        .where("amount", "==", ocr_result.get("amount", ""))\
+        .where("date", "==", ocr_result.get("date", ""))\
+        .limit(1).get()
+    is_duplicate = len(existing) > 0
 
-    # Policy RAG + LLM audit
     policy_context = get_policy_context(purpose, receipt_text)
     policy_snippet = get_policy_snippet(purpose, receipt_text)
 
@@ -97,8 +80,22 @@ async def upload_receipt(
     except RuntimeError as e:
         raise HTTPException(status_code=429, detail=str(e))
 
+    now = datetime.utcnow().isoformat()
+    notifications = [{"type": "submitted", "message": "Your expense claim has been submitted and is under review.", "timestamp": now}]
+
+    if is_duplicate:
+        notifications.append({"type": "warning", "message": "Possible duplicate detected.", "timestamp": now})
+
+    if audit["decision"] == "Approved":
+        notifications.append({"type": "approved", "message": "Your claim has been approved. Reimbursement will be processed within 5–7 business days.", "timestamp": now})
+    elif audit["decision"] == "Rejected":
+        notifications.append({"type": "rejected", "message": f"Your claim was rejected: {audit['reason']}", "timestamp": now})
+    else:
+        notifications.append({"type": "flagged", "message": f"Your claim requires further review: {audit['reason']}", "timestamp": now})
+
+    claim_id = str(uuid.uuid4())
     claim = {
-        "id": str(uuid.uuid4()),
+        "id": claim_id,
         "employee": employee,
         "purpose": purpose,
         "user_id": user_id,
@@ -120,57 +117,21 @@ async def upload_receipt(
         "policy_snippet": policy_snippet,
         "date_warning": date_warning,
         "image_url": f"/receipts/{image_filename}",
-        "submitted_at": datetime.utcnow().isoformat(),
+        "submitted_at": now,
         "overridden": False,
         "override_reason": "",
-        "notifications": [
-            {
-                "type": "submitted",
-                "message": f"Your expense claim has been submitted and is under review.",
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-        ],
+        "notifications": notifications,
     }
 
-    # Add audit notification
-    if is_duplicate:
-        claim["notifications"].append({
-            "type": "warning",
-            "message": "Possible duplicate detected: a claim with the same merchant, amount, and date has been submitted before.",
-            "timestamp": datetime.utcnow().isoformat(),
-        })
-
-    if audit["decision"] == "Approved":
-        claim["notifications"].append({
-            "type": "approved",
-            "message": f"Your claim has been approved. Reimbursement will be processed within 5–7 business days.",
-            "timestamp": datetime.utcnow().isoformat(),
-        })
-    elif audit["decision"] == "Rejected":
-        claim["notifications"].append({
-            "type": "rejected",
-            "message": f"Your claim was rejected: {audit['reason']}",
-            "timestamp": datetime.utcnow().isoformat(),
-        })
-    else:
-        claim["notifications"].append({
-            "type": "flagged",
-            "message": f"Your claim requires further review: {audit['reason']}",
-            "timestamp": datetime.utcnow().isoformat(),
-        })
-
-    claims = load_claims()
-    claims.append(claim)
-    save_claims(claims)
-
+    db.collection("claims").document(claim_id).set(claim)
     return claim
 
 
 # ── GET /claims ───────────────────────────────────────────────────────────────
 @app.get("/claims")
 def get_claims():
-    claims = load_claims()
-    # Sort by risk: High first, then Medium, then Low
+    docs = db.collection("claims").get()
+    claims = [d.to_dict() for d in docs]
     risk_order = {"High": 0, "Medium": 1, "Low": 2}
     claims.sort(key=lambda c: risk_order.get(c.get("risk", "Low"), 2))
     return claims
@@ -179,11 +140,10 @@ def get_claims():
 # ── GET /claims/{id} ──────────────────────────────────────────────────────────
 @app.get("/claims/{claim_id}")
 def get_claim(claim_id: str):
-    claims = load_claims()
-    for claim in claims:
-        if claim["id"] == claim_id:
-            return claim
-    raise HTTPException(status_code=404, detail="Claim not found")
+    doc = db.collection("claims").document(claim_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Claim not found")
+    return doc.to_dict()
 
 
 # ── POST /override ────────────────────────────────────────────────────────────
@@ -195,67 +155,67 @@ class OverrideRequest(BaseModel):
 
 @app.post("/override")
 def override_claim(body: OverrideRequest):
-    claims = load_claims()
-    for claim in claims:
-        if claim["id"] == body.claim_id:
-            claim["decision"] = body.new_decision
-            claim["overridden"] = True
-            claim["override_reason"] = body.override_reason
-            claim["notifications"].append({
-                "type": "override",
-                "message": f"Finance team updated your claim to '{body.new_decision}'. Note: {body.override_reason}",
-                "timestamp": datetime.utcnow().isoformat(),
-            })
-            save_claims(claims)
-            return claim
-    raise HTTPException(status_code=404, detail="Claim not found")
+    ref = db.collection("claims").document(body.claim_id)
+    doc = ref.get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Claim not found")
+    claim = doc.to_dict()
+    now = datetime.utcnow().isoformat()
+    notifications = claim.get("notifications", [])
+    notifications.append({
+        "type": "override",
+        "message": f"Finance team updated your claim to '{body.new_decision}'. Note: {body.override_reason}",
+        "timestamp": now,
+    })
+    ref.update({
+        "decision": body.new_decision,
+        "overridden": True,
+        "override_reason": body.override_reason,
+        "notifications": notifications,
+    })
+    return ref.get().to_dict()
 
 
-# ── GET /notifications/{employee} ─────────────────────────────────────────────
-@app.get("/notifications/{user_id}")
-def get_notifications(user_id: str):
-    claims = load_claims()
-    result = []
-    for claim in claims:
-        if claim.get("user_id") == user_id:
-            for n in claim.get("notifications", []):
-                result.append({**n, "claim_id": claim["id"], "merchant": claim["merchant"], "amount": claim["amount"], "currency": claim["currency"]})
-    result.sort(key=lambda x: x["timestamp"], reverse=True)
-    return result
-
-
-# ── GET /my-claims/{employee} ─────────────────────────────────────────────────
+# ── GET /my-claims/{user_id} ──────────────────────────────────────────────────
 @app.get("/my-claims/{user_id}")
 def get_my_claims(user_id: str):
-    claims = load_claims()
-    return [c for c in claims if c.get("user_id") == user_id]
+    docs = db.collection("claims").where("user_id", "==", user_id).get()
+    return [d.to_dict() for d in docs]
+
+
+# ── GET /notifications/{user_id} ─────────────────────────────────────────────
+@app.get("/notifications/{user_id}")
+def get_notifications(user_id: str):
+    docs = db.collection("claims").where("user_id", "==", user_id).get()
+    result = []
+    for doc in docs:
+        claim = doc.to_dict()
+        for n in claim.get("notifications", []):
+            result.append({**n, "claim_id": claim["id"], "merchant": claim["merchant"], "amount": claim["amount"], "currency": claim["currency"]})
+    result.sort(key=lambda x: x["timestamp"], reverse=True)
+    return result
 
 
 # ── GET /analytics ────────────────────────────────────────────────────────────
 @app.get("/analytics")
 def get_analytics():
-    claims = load_claims()
+    docs = db.collection("claims").get()
+    claims = [d.to_dict() for d in docs]
     if not claims:
         return {"by_decision": {}, "by_category": {}, "by_risk": {}, "avg_score": 0, "total": 0, "duplicate_count": 0}
-
     by_decision: dict = {}
     by_category: dict = {}
     by_risk: dict = {}
     scores = []
     duplicates = 0
-
     for c in claims:
-        d = c.get("decision", "Unknown")
-        cat = c.get("category", "Other")
-        risk = c.get("risk", "Unknown")
-        by_decision[d] = by_decision.get(d, 0) + 1
-        by_category[cat] = by_category.get(cat, 0) + 1
-        by_risk[risk] = by_risk.get(risk, 0) + 1
+        by_decision[c.get("decision", "Unknown")] = by_decision.get(c.get("decision", "Unknown"), 0) + 1
+        by_category[c.get("category", "Other")] = by_category.get(c.get("category", "Other"), 0) + 1
+        by_risk[c.get("risk", "Unknown")] = by_risk.get(c.get("risk", "Unknown"), 0) + 1
         if c.get("compliance_score"):
             scores.append(c["compliance_score"])
         if c.get("is_duplicate"):
             duplicates += 1
-
     return {
         "total": len(claims),
         "by_decision": by_decision,
@@ -269,13 +229,10 @@ def get_analytics():
 # ── POST /policy/upload ───────────────────────────────────────────────────────
 @app.post("/policy/upload")
 async def upload_policy(file: UploadFile = File(...)):
-    """Replace the policy document. Accepts .txt or .pdf."""
     file_bytes = await file.read()
     filename = (file.filename or "").lower()
-
     if filename.endswith(".pdf"):
-        import io
-        import pdfplumber
+        import io, pdfplumber
         text_pages = []
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
             for page in pdf.pages:
@@ -289,19 +246,15 @@ async def upload_policy(file: UploadFile = File(...)):
         text = file_bytes.decode("utf-8", errors="ignore")
     else:
         raise HTTPException(status_code=400, detail="Only .txt or .pdf files are supported.")
-
     policy_path = os.path.join(DATA_DIR, "policy.txt")
     with open(policy_path, "w", encoding="utf-8") as f:
         f.write(text)
-
-    word_count = len(text.split())
-    return {"message": "Policy updated successfully.", "word_count": word_count}
+    return {"message": "Policy updated successfully.", "word_count": len(text.split())}
 
 
 # ── GET /policy/preview ───────────────────────────────────────────────────────
 @app.get("/policy/preview")
 def preview_policy():
-    """Return the first 500 words of the current policy."""
     policy_path = os.path.join(DATA_DIR, "policy.txt")
     if not os.path.exists(policy_path):
         return {"preview": "No policy loaded.", "word_count": 0}

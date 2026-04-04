@@ -18,7 +18,7 @@ This platform solves that by combining **OCR receipt extraction**, **policy-awar
 - Dark landing page with role selector on first load
 - **Firebase Email/Password authentication** — employees and auditors sign in with their own account
 - **Employee** view: Submit Expense, My Expenses, Notifications
-- **Finance Auditor** view: Claims Dashboard, Analytics
+- **Finance Auditor** view: Claims Dashboard, Analytics, Policy Manager
 - Role badge and user email shown in navbar with sign out button
 - Claims and notifications are scoped per user — employees only see their own data
 
@@ -41,25 +41,25 @@ This platform solves that by combining **OCR receipt extraction**, **policy-awar
 - Risk scoring: **Low / Medium / High**
 - **Duplicate detection**: flags claims with matching merchant, amount, and date from the same employee
 
-### Finance Auditor Dashboard
+### Finance Dashboard
 - Table of all claims sorted by **risk level** (High → Medium → Low)
 - Summary cards: Total, Approved, Flagged, Rejected
 - Columns include **category tag** and **compliance score** per claim
 - Duplicate warning badge on suspicious claims
-- **Override** any AI decision with a custom comment — triggers email to employee
+- **Override** any AI decision with a custom comment
 - Click any claim to open the **Audit Detail View**
+
+### Policy Manager (Finance Auditor)
+- Upload a new company policy as a **.txt or .pdf** file directly from the UI
+- PDF text is automatically extracted using pdfplumber
+- New policy takes effect immediately for all future audits — no restart needed
+- Preview the current active policy with word count
 
 ### Spend Analytics
 - KPI cards: total claims, average compliance score, high-risk count, duplicate count
 - Three interactive **pie charts**: claims by decision, by expense category, and by risk level
 - Percentage labels on each slice with hover tooltips showing exact counts
 - Live data from all submitted claims
-
-### Policy Manager (Finance Auditor only)
-- Upload a new company policy as **.txt or .pdf** directly from the UI
-- PDF text is automatically extracted using pdfplumber
-- New policy takes effect immediately for all future audits — no restart needed
-- Live preview of the current policy with word count
 
 ### My Expenses (Employee View)
 - Auto-loads the logged-in employee's personal claim history — no name search needed
@@ -91,8 +91,7 @@ This platform solves that by combining **OCR receipt extraction**, **policy-awar
 | OCR | Pytesseract + Pillow + pdf2image |
 | LLM | Groq API — LLaMA 3.3 70B Versatile |
 | Policy RAG | Keyword-based chunk retrieval (no vector DB) |
-| Policy Ingestion | pdfplumber (PDF → text extraction) |
-| Storage | JSON flat file + local image storage |
+| Storage | Google Firestore (NoSQL cloud database) |
 
 ---
 
@@ -107,8 +106,8 @@ expenseauditor/
 │   └── requirements.txt
 │
 ├── data/
-│   ├── policy.txt          # 12-section company T&E policy document
-│   ├── claims.json         # Persisted claims store
+│   ├── policy.txt          # Active company T&E policy document (replaceable via UI)
+│   ├── serviceAccountKey.json  # Firebase service account key (not committed)
 │   └── images/             # Uploaded receipt files
 │
 ├── frontend/
@@ -124,7 +123,6 @@ expenseauditor/
 │           ├── Dashboard.tsx       # Finance overview table with category + score columns
 │           ├── ClaimDetail.tsx     # Audit trail timeline + side-by-side detail view
 │           ├── SpendAnalytics.tsx  # Pie charts: by decision, category, risk
-│           ├── PolicyManager.tsx   # Upload/replace company policy PDF or TXT
 │           ├── MyExpenses.tsx      # Employee personal claim history (auth-scoped)
 │           └── Notifications.tsx  # Employee status update inbox (auth-scoped)
 │
@@ -145,7 +143,7 @@ Before running the project, ensure the following are installed:
 - **Tesseract OCR** — [Windows installer](https://github.com/UB-Mannheim/tesseract/wiki)
 - **Poppler** (for PDF support) — [Windows binaries](https://github.com/oschwartz10612/poppler-windows/releases)
 - **Groq API key** (free) — [console.groq.com](https://console.groq.com/keys)
-- **Firebase project** with Email/Password auth enabled — [console.firebase.google.com](https://console.firebase.google.com)
+- **Firebase project** with Email/Password auth enabled and **Firestore** database created — [console.firebase.google.com](https://console.firebase.google.com)
 - **EmailJS account** with SMTP service configured — [emailjs.com](https://www.emailjs.com)
 
 ---
@@ -196,6 +194,11 @@ Create a `.env.local` file in the project root:
 GROQ_API_KEY=your_groq_api_key_here
 ```
 
+Place your Firebase service account key at:
+```
+data/serviceAccountKey.json
+```
+Download it from Firebase Console → Project Settings → Service Accounts → Generate new private key.
 ### 5. Install frontend dependencies
 ```bash
 cd frontend
@@ -237,8 +240,6 @@ The API is available at [http://localhost:8000](http://localhost:8000) — visit
 | `GET` | `/notifications/{user_id}` | Get all status updates for a user (by Firebase UID) |
 | `GET` | `/my-claims/{user_id}` | Get all claims submitted by a user (by Firebase UID) |
 | `GET` | `/analytics` | Aggregated stats: by decision, category, risk, avg score |
-| `POST` | `/policy/upload` | Upload a new policy document (.txt or .pdf) |
-| `GET` | `/policy/preview` | Preview the current policy with word count |
 
 ---
 
@@ -250,9 +251,9 @@ OCR extracts: Merchant, Date, Amount, Currency + blur/quality check
         ↓
 Duplicate detection: checks for same merchant + amount + date from same employee
         ↓
-Policy document loaded (uploaded via Policy Manager or default policy.txt)
+Policy document is chunked into paragraphs
         ↓
-Policy chunked into paragraphs — top 4 retrieved via keyword matching
+Top 4 most relevant chunks retrieved via keyword matching
         ↓
 LLM receives: policy chunks + receipt text + business purpose
         ↓
@@ -260,7 +261,7 @@ LLM returns: Decision + Reason (citing policy rule) + Risk + Category + Complian
         ↓
 Claim saved with full audit trail + notifications generated
         ↓
-Email sent to employee via EmailJS · Dashboard updated · Analytics refreshed
+Finance dashboard sorted by risk · Analytics updated · Employee notified
 ```
 
 ---
@@ -282,9 +283,11 @@ Email sent to employee via EmailJS · Dashboard updated · Analytics refreshed
 
 ## Notes
 
-- All data is stored locally in `data/claims.json` and `data/images/`. No external database is required.
-- The policy document (`data/policy.txt`) can be replaced with your own company policy. The RAG engine will automatically adapt.
-- This project is designed for hackathon and demo use. For production, replace the JSON store with a proper database and add authentication.
+- Claims are stored in **Google Firestore** — no local database setup required.
+- Receipt images are stored locally in `data/images/`.
+- The policy document (`data/policy.txt`) can be replaced via the Finance Auditor's Policy Manager tab, or by uploading a PDF/TXT directly.
+- `data/serviceAccountKey.json` is required for the backend to connect to Firestore — never commit this file.
+- This project is designed for hackathon and demo use. For production, add proper role-based Firestore security rules and server-side auth verification.
 
 ---
 
