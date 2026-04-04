@@ -1,6 +1,16 @@
 # ExpenseAudit — Policy-First Expense Auditor
 
-An intelligent, AI-powered expense compliance platform that automatically audits employee expense claims against company policy — eliminating manual review, reducing spend leakage, and delivering instant, explainable decisions.
+---
+
+## The Problem
+
+Corporate finance teams manually cross-reference every employee expense receipt against a 40+ page Travel & Expense Policy — a process that is slow, inconsistent, and error-prone. Spending limits vary by location and seniority, policy language is ambiguous, and high receipt volumes create 3-week reimbursement backlogs, resulting in "Spend Leakage" where non-compliant claims slip through undetected.
+
+---
+
+## The Solution
+
+ExpenseAudit is an AI-powered expense compliance platform that simultaneously reads a receipt and the company policy to automatically audit every claim — with zero manual cross-referencing. Employees upload receipts (JPG, PNG, PDF), provide a business justification, and receive an instant Approved / Flagged / Rejected decision with a one-sentence explanation citing the specific policy rule. Finance auditors get a risk-sorted dashboard, override capability, spend analytics, and the ability to hot-swap the company policy document at any time.
 
 ---
 
