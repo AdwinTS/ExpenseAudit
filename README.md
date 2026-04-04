@@ -14,6 +14,46 @@ ExpenseAudit is an AI-powered expense compliance platform that simultaneously re
 
 ---
 
+## Video Demo
+
+> 🎬 [Watch the Demo on Google Drive](https://drive.google.com/file/d/1wdHV3wA71JvMsY6pGFW5UR169nzWMb05/view?usp=drive_link)
+
+---
+
+## Screenshots
+
+### Role Selection — Landing Page
+![Role Selection](docs/screenshots/01-role-select.png)
+
+### Employee Login
+![Login](docs/screenshots/02-login.png)
+
+### Submit Expense Claim
+![Submit Expense](docs/screenshots/03-submit-expense.png)
+
+### Audit Result
+![Audit Result](docs/screenshots/04-audit-result.png)
+
+### Finance Dashboard
+![Finance Dashboard](docs/screenshots/05-dashboard.png)
+
+### Audit Detail View (Timeline + Policy Snippet)
+![Audit Detail](docs/screenshots/06-audit-detail.png)
+
+### Spend Analytics
+![Analytics](docs/screenshots/07-analytics.png)
+
+### My Expenses (Employee View)
+![My Expenses](docs/screenshots/08-my-expenses.png)
+
+### Notifications
+![Notifications](docs/screenshots/09-notifications.png)
+
+### Policy Manager
+![Policy Manager](docs/screenshots/10-policy-manager.png)
+
+---
+
 ## Overview
 
 Corporate expense auditing is a high-stakes, repetitive process. Finance teams spend hours cross-referencing receipts against multi-page policy documents, leading to backlogs, inconsistency, and non-compliant claims slipping through.
