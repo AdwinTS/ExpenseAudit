@@ -16,7 +16,7 @@ ExpenseAudit is an AI-powered expense compliance platform that simultaneously re
 
 ## Video Demo
 
-> 🎬 [Watch the Demo on Google Drive](https://drive.google.com/file/d/1wdHV3wA71JvMsY6pGFW5UR169nzWMb05/view?usp=drive_linkhttps://drive.google.com/file/d/1yWrevLITbl6C8K-PAwIGwUjyXsu6w9Kh/view?usp=sharing)
+> 🎬 [Watch the Demo on Google Drive](https://drive.google.com/file/d/1yWrevLITbl6C8K-PAwIGwUjyXsu6w9Kh/view?usp=drive_link)
 
 ---
 
