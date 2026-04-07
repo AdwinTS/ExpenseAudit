@@ -42,7 +42,9 @@ app.add_middleware(
     allow_credentials=False,
 )
 
-DATA_DIR   = os.path.join(BASE_DIR, "..", "data")
+# Data dir: ../data when running locally, ./data when root is backend (Render)
+_local_data = os.path.join(BASE_DIR, "..", "data")
+DATA_DIR = _local_data if os.path.exists(_local_data) else os.path.join(BASE_DIR, "data")
 IMAGES_DIR = os.path.join(DATA_DIR, "images")
 os.makedirs(IMAGES_DIR, exist_ok=True)
 app.mount("/receipts", StaticFiles(directory=IMAGES_DIR), name="receipts")
