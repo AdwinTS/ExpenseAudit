@@ -9,3 +9,4 @@ pdf2image
 groq
 python-dotenv
 pdfplumber
+firebase-admin
