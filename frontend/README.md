@@ -120,3 +120,26 @@ The Finance Auditor can upload a new company policy at any time from the **Polic
 - PDF text is extracted server-side via pdfplumber
 - New policy takes effect immediately for all future claim audits
 - Current policy is previewed with word count so auditors can verify the upload
+
+---
+
+## Deployment (Vercel)
+
+The frontend is deployed on Vercel.
+
+- Live URL: https://expense-audit.vercel.app/
+
+### Deploy steps
+1. Go to [vercel.com](https://vercel.com) → Import repo
+2. Set root directory to `frontend`
+3. Add all environment variables from `frontend/.env.local` plus:
+   ```
+   VITE_API_URL=https://expenseaudit-1.onrender.com
+   ```
+4. Deploy
+
+### Build command
+```bash
+npm run build
+```
+Vite compiles TypeScript + React into static files in `dist/`. Vercel serves these from its global CDN.

@@ -137,3 +137,23 @@ LLM returns: Decision, Reason, Risk, Category, Compliance Score
       ↓
 Claim saved to Firestore + notifications generated
 ```
+
+---
+
+## Deployment (Render)
+
+The backend is deployed on Render using Docker.
+
+- Live API: https://expenseaudit-1.onrender.com
+- Swagger docs: https://expenseaudit-1.onrender.com/docs
+
+### Docker setup
+The `Dockerfile` at the project root installs `tesseract-ocr` and `poppler-utils` as system packages, copies the backend code and `data/policy.txt`, installs Python dependencies, and starts uvicorn.
+
+### Environment variables on Render
+| Variable | Description |
+|---|---|
+| `GROQ_API_KEY` | Groq API key for LLaMA 3.3 inference |
+| `GOOGLE_CREDENTIALS_JSON` | Full JSON contents of `serviceAccountKey.json` |
+
+> Note: Render's free tier has cold starts after 15 min inactivity. First request may take ~30 seconds.

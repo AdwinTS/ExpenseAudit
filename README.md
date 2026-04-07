@@ -1,5 +1,14 @@
 # ExpenseAudit — Policy-First Expense Auditor
 
+## Live Demo
+
+| | URL |
+|---|---|
+| Frontend | https://expense-audit.vercel.app/ |
+| Backend API | https://expenseaudit-1.onrender.com/docs |
+
+> The backend is hosted on Render's free tier — first request after inactivity may take ~30 seconds to wake up.
+
 ---
 
 ## The Problem
@@ -257,9 +266,27 @@ npm install
 
 ---
 
-## Running the Application
+## Deployment
 
-Open two terminals:
+### Backend — Render (Docker)
+The backend is containerised using Docker. The `Dockerfile` at the project root installs Tesseract OCR and Poppler as system dependencies, then runs the FastAPI app.
+
+- Live URL: https://expenseaudit-1.onrender.com
+- API docs: https://expenseaudit-1.onrender.com/docs
+- Config: `render.yaml` + `Dockerfile` in project root
+
+Required environment variables on Render:
+- `GROQ_API_KEY`
+- `GOOGLE_CREDENTIALS_JSON` — paste the full contents of `serviceAccountKey.json`
+
+### Frontend — Vercel
+- Live URL: https://expense-audit.vercel.app/
+- Root directory: `frontend`
+- Required env vars: all `VITE_*` keys from `frontend/.env.local` plus `VITE_API_URL=https://expenseaudit-1.onrender.com`
+
+---
+
+Open two terminals (local development):
 
 **Terminal 1 — Backend**
 ```bash
@@ -334,10 +361,11 @@ Finance dashboard sorted by risk · Analytics updated · Employee notified
 ## Notes
 
 - Claims are stored in **Google Firestore** — no local database setup required.
-- Receipt images are stored locally in `data/images/`.
+- Receipt images are stored locally in `data/images/` (local dev) or ephemerally on Render (production).
 - The policy document (`data/policy.txt`) can be replaced via the Finance Auditor's Policy Manager tab, or by uploading a PDF/TXT directly.
-- `data/serviceAccountKey.json` is required for the backend to connect to Firestore — never commit this file.
-- This project is designed for hackathon and demo use. For production, add proper role-based Firestore security rules and server-side auth verification.
+- `data/serviceAccountKey.json` is required for local dev — never commit this file. On Render, use the `GOOGLE_CREDENTIALS_JSON` env var instead.
+- The backend is deployed on Render's free tier — cold starts may occur after 15 minutes of inactivity.
+- This project was built for the Cymonic.ai Hackathon 2026.
 
 ---
 
