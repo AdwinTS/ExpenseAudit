@@ -15,8 +15,20 @@ from llm import audit_expense
 
 # ── Firebase init ─────────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(__file__)
-KEY_PATH = os.path.join(BASE_DIR, "..", "data", "serviceAccountKey.json")
-cred = credentials.Certificate(KEY_PATH)
+
+# Support both local file (dev) and env var (Render/production)
+_google_creds_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
+if _google_creds_json:
+    import json
+    import tempfile
+    _tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+    _tmp.write(_google_creds_json)
+    _tmp.close()
+    cred = credentials.Certificate(_tmp.name)
+else:
+    KEY_PATH = os.path.join(BASE_DIR, "..", "data", "serviceAccountKey.json")
+    cred = credentials.Certificate(KEY_PATH)
+
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
