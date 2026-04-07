@@ -34,10 +34,10 @@ function toChartData(obj: Record<string, number>) {
 }
 
 const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: {
-  cx: number; cy: number; midAngle: number;
-  innerRadius: number; outerRadius: number; percent: number;
+  cx?: number; cy?: number; midAngle?: number;
+  innerRadius?: number; outerRadius?: number; percent?: number;
 }) => {
-  if (percent < 0.05) return null;
+  if (!percent || percent < 0.05 || cx == null || cy == null || midAngle == null || innerRadius == null || outerRadius == null) return null;
   const RADIAN = Math.PI / 180;
   const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
@@ -101,7 +101,7 @@ export default function SpendAnalytics() {
                   <Cell key={entry.name} fill={DECISION_COLORS[entry.name] || "#94a3b8"} />
                 ))}
               </Pie>
-              <Tooltip formatter={(v: number) => [`${v} claims`, ""]} />
+              <Tooltip formatter={(v) => [`${v} claims`, ""]} />
               <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "12px" }} />
             </PieChart>
           </ResponsiveContainer>
@@ -118,7 +118,7 @@ export default function SpendAnalytics() {
                   <Cell key={i} fill={CATEGORY_PALETTE[i % CATEGORY_PALETTE.length]} />
                 ))}
               </Pie>
-              <Tooltip formatter={(v: number) => [`${v} claims`, ""]} />
+              <Tooltip formatter={(v) => [`${v} claims`, ""]} />
               <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "12px" }} />
             </PieChart>
           </ResponsiveContainer>
@@ -135,7 +135,7 @@ export default function SpendAnalytics() {
                   <Cell key={entry.name} fill={RISK_COLORS[entry.name] || "#94a3b8"} />
                 ))}
               </Pie>
-              <Tooltip formatter={(v: number) => [`${v} claims`, ""]} />
+              <Tooltip formatter={(v) => [`${v} claims`, ""]} />
               <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "12px" }} />
             </PieChart>
           </ResponsiveContainer>
